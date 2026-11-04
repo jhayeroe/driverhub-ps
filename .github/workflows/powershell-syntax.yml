@@ -1,0 +1,30 @@
+name: DriverHub PowerShell syntax checks
+
+on:
+  push:
+    paths:
+      - 'DriverHub.ps1'
+      - 'AsusDrivers.ps1'
+      - '.github/workflows/powershell-syntax.yml'
+  workflow_dispatch:
+
+jobs:
+  powershell-parse:
+    name: Parse Windows PowerShell 5.1 files
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse DriverHub and ASUS extension with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          foreach ($relative in @('DriverHub.ps1','AsusDrivers.ps1')) {
+            $file=(Resolve-Path $relative).Path
+            $tokens=$null
+            $parseErrors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$parseErrors)
+            if (@($parseErrors).Count -gt 0) {
+              $parseErrors | Format-List Message,Extent | Out-Host
+              throw "$relative has $(@($parseErrors).Count) syntax errors"
+            }
+            Write-Host "$relative syntax OK"
+          }
