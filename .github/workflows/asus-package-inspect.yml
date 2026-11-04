@@ -1,0 +1,52 @@
+name: Inspect ASUS FX506HF WLAN package format
+
+on:
+  push:
+    paths:
+      - '.github/workflows/asus-package-inspect.yml'
+  workflow_dispatch:
+
+jobs:
+  package-inspection:
+    runs-on: windows-latest
+    steps:
+      - name: Download/hash ASUS package and inspect without executing it
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $api='https://www.asus.com/support/api/product.asmx/GetPDDrivers?website=ph&model=FX506HF&osid=52'
+          $response=Invoke-RestMethod -UseBasicParsing -Uri $api -TimeoutSec 30
+          $items=@(foreach($group in @($response.Result.Obj)){
+            foreach($f in @($group.Files)){
+              if([string]$f.Title -match '(?i)MediaTek.*WLAN|WLAN.*MediaTek'){$f}
+            }
+          })
+          $entry=$items|Sort-Object Version -Descending|Select-Object -First 1
+          if(-not $entry){throw 'No official MediaTek WLAN package'}
+          $uri=[uri]$entry.DownloadUrl.Global
+          Write-Host "ASUS version=$($entry.Version), path-ext=$([IO.Path]::GetExtension($uri.AbsolutePath)), source-host=$($uri.Host)"
+          if($uri.Scheme -ne 'https' -or $uri.Host -notmatch '(^|\.)asus\.com$'){throw 'Non-ASUS URL'}
+          $f=Join-Path $env:TEMP 'ASUS-WLAN.exe'
+          Invoke-WebRequest -Uri $uri.AbsoluteUri -UseBasicParsing -TimeoutSec 180 -OutFile $f
+          $hash=(Get-FileHash $f -Algorithm SHA256).Hash
+          if($hash -ine $entry.sha256){throw 'Hash mismatch'}
+          Write-Host "Verified ASUS SHA-256 $hash"
+          $bytes=[System.IO.File]::ReadAllBytes($f)
+          Write-Host ("File first 16 bytes: "+[BitConverter]::ToString($bytes,0,16))
+          $seven='C:\Program Files\7-Zip\7z.exe'
+          if(Test-Path $seven){
+            Write-Host '7ZIP_ARCHIVE_INSPECT:'
+            & $seven l -slt $f | Select-String -Pattern '(?i)Path = |Type = |\\.inf|\\.cab|\\.exe|\\.bat|\\.cmd' | Select-Object -First 80 | Out-Host
+          }else{Write-Host '7z unavailable'}
+          try{
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $archive=[IO.Compression.ZipFile]::OpenRead($f)
+            $entries=@($archive.Entries)
+            Write-Host ('DOTNET_ZIP_SUCCESS entries='+$entries.Count)
+            $entries|Where-Object FullName -match '\.inf$'|Select-Object -First 10 FullName|Format-Table -AutoSize|Out-Host
+            $archive.Dispose()
+          }catch{Write-Host ('DOTNET_ZIP_FAIL '+$_.Exception.Message)}
+          try{
+            Write-Host 'TAR_ARCHIVE_INSPECT:'
+            & "$env:windir\System32\tar.exe" -tf $f 2>&1 | Select-Object -First 20 | Out-Host
+          }catch{Write-Host ('TAR_FAIL '+$_.Exception.Message)}
