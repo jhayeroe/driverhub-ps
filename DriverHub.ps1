@@ -395,7 +395,7 @@ function Deep-Menu($catalog=$null){
     '2'{
      $others=@($available|Where-Object {$_.Allowed -and $_.Source -ne 'WU'})
      if($others.Count){Apply-Drivers $ctx.WU $others $ctx.OEM;$ctx=Deep-State $null}
-     else{Note 'No verified installable ASUS/OEM/local driver package. Check ASUS catalog status above for reason.' 'Yellow'}
+     else{Note 'No verified ASUS/OEM/local package. Check ASUS catalog status above for reason.' 'Yellow'}
     }
     '3'{
      for($i=0;$i -lt $available.Count;$i++){
@@ -496,7 +496,7 @@ function Main-Menu {
  }while($choice -ne '5')
 }
 
-# Built-in ASUS module (included locally in this one-file GitHub launcher)
+# Built-in ASUS module (self-contained in this one-line launcher)
 # ASUS official catalog extension - DriverHub PS v2.1
 # Supports targeted MediaTek MT7921 WLAN repairs on ASUS TUF FX506HF.
 # Runs in the current PowerShell session; requires DriverHub.ps1 already loaded.
@@ -543,12 +543,7 @@ function Get-ASUSCatalog($o){
    $response=Invoke-RestMethod -Method Get -Uri $url -UseBasicParsing -TimeoutSec 20 -Headers @{'Accept'='application/json';'User-Agent'='Mozilla/5.0 (DriverHub PS)'}
    if($response -is [string]){
     $json=$response -replace '^[A-Za-z_][A-Za-z0-9_]*\(',''
-    $json=$json -replace '\);?\s*
-$transcript=$false
-try{Start-Transcript -Path $log -ErrorAction Stop|Out-Null;$transcript=$true}catch{}
-try{if($Scan){Scan1-Menu}elseif($Deep){Deep-Menu}else{Main-Menu}}
-finally{if($transcript){try{Stop-Transcript|Out-Null}catch{}}}
-,''
+    $json=$json -replace '\);?\s*$',''
     $response=$json|ConvertFrom-Json
    }
    if($response.Result -and $response.Result.Obj){
@@ -588,19 +583,9 @@ finally{if($transcript){try{Stop-Transcript|Out-Null}catch{}}}
     $uri=[uri]$download
     $urlValid=($uri.Scheme -eq 'https' -and
       $uri.Host -in @('dlcdnets.asus.com','dlcdnets.asus.com','dlcdnweb.asus.com','www.asus.com','rog.asus.com') -and
-      $uri.AbsolutePath -match '(?i)\.(zip|cab)
-$transcript=$false
-try{Start-Transcript -Path $log -ErrorAction Stop|Out-Null;$transcript=$true}catch{}
-try{if($Scan){Scan1-Menu}elseif($Deep){Deep-Menu}else{Main-Menu}}
-finally{if($transcript){try{Stop-Transcript|Out-Null}catch{}}}
-)
+      $uri.AbsolutePath -match '(?i)\.(zip|cab)$')
    }catch{}
-   $hashValid=($hash -match '^[a-fA-F0-9]{64}
-$transcript=$false
-try{Start-Transcript -Path $log -ErrorAction Stop|Out-Null;$transcript=$true}catch{}
-try{if($Scan){Scan1-Menu}elseif($Deep){Deep-Menu}else{Main-Menu}}
-finally{if($transcript){try{Stop-Transcript|Out-Null}catch{}}}
-)
+   $hashValid=($hash -match '^[a-fA-F0-9]{64}$')
    $allowed=$hardwareFound -and $urlValid -and $hashValid -and ($versionValue -ge $installed)
    $reason=if(-not $hardwareFound){'Matching MediaTek adapter / PCI hardware ID not confirmed'}
     elseif(-not $urlValid){'Official download URL was not an approved ASUS ZIP/CAB'}
@@ -624,12 +609,7 @@ finally{if($transcript){try{Stop-Transcript|Out-Null}catch{}}}
 function Install-ASUS([object[]]$selected){
  foreach($entry in $selected){
   if(-not $entry.Allowed){Note ('Blocked: '+$entry.Reason) 'Yellow';continue}
-  if($entry.Sha256 -notmatch '^[a-fA-F0-9]{64}
-$transcript=$false
-try{Start-Transcript -Path $log -ErrorAction Stop|Out-Null;$transcript=$true}catch{}
-try{if($Scan){Scan1-Menu}elseif($Deep){Deep-Menu}else{Main-Menu}}
-finally{if($transcript){try{Stop-Transcript|Out-Null}catch{}}}
-){Note 'Missing ASUS SHA-256; blocked.' 'Red';continue}
+  if($entry.Sha256 -notmatch '^[a-fA-F0-9]{64}$'){Note 'Missing ASUS SHA-256; blocked.' 'Red';continue}
   $uri=$null
   try{$uri=[uri]$entry.Url}catch{Note 'Invalid URL; blocked.' 'Red';continue}
   if($uri.Scheme -ne 'https' -or $uri.Host -notin @('dlcdnets.asus.com','dlcdnets.asus.com','dlcdnweb.asus.com','www.asus.com','rog.asus.com')){
