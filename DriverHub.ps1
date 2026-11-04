@@ -8,7 +8,7 @@ $reports=Join-Path $root 'Reports'
 $backups=Join-Path $root 'Backups'
 $drivers=Join-Path $root 'OEM-Drivers'
 foreach($d in @($root,$reports,$backups,$drivers)){[void](New-Item -ItemType Directory -Path $d -Force)}
-$admin=New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+$admin=[Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
 if(-not $admin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)){Write-Host 'Run Windows PowerShell as Administrator.' -ForegroundColor Red;return}
 if($PSVersionTable.PSEdition -ne 'Desktop'){Write-Host 'Use Windows PowerShell 5.1 (powershell.exe).' -ForegroundColor Red;return}
 $script:cfg=[ordered]@{Backup=$true;RestorePoint=$true;Days=3}
