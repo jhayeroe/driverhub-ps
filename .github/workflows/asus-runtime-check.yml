@@ -38,6 +38,6 @@ jobs:
           foreach($item in $found){
             Write-Host ("Found: {0}; URL={1}; SHA={2}" -f $item.Name,([uri]$item.Url).Host,$item.Sha256)
             if($item.Source -ne 'ASUS' -or $item.Sha256 -notmatch '^[0-9a-fA-F]{64}$'){throw 'Metadata verification failed'}
-            if($item.Url -notmatch '(?i)\.exe$'){throw 'Unexpected ASUS package extension'}
+            if(([uri]$item.Url).AbsolutePath -notmatch '(?i)\.exe$'){throw 'Unexpected ASUS package extension'}
           }
           Write-Host 'ASUS catalog function smoke check passed. No drivers installed.'
