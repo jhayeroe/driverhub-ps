@@ -84,12 +84,12 @@ function Get-ASUSCatalog($o){
     $uri=[uri]$download
     $urlValid=($uri.Scheme -eq 'https' -and
       $uri.Host -in @('dlcdnets.asus.com','dlcdnets.asus.com','dlcdnweb.asus.com','www.asus.com','rog.asus.com') -and
-      $uri.AbsolutePath -match '(?i)\.(zip|cab)$')
+      $uri.AbsolutePath -match '(?i)\.(zip|cab|exe)$')
    }catch{}
    $hashValid=($hash -match '^[a-fA-F0-9]{64}$')
    $allowed=$hardwareFound -and $urlValid -and $hashValid -and ($versionValue -ge $installed)
    $reason=if(-not $hardwareFound){'Matching MediaTek adapter / PCI hardware ID not confirmed'}
-    elseif(-not $urlValid){'Official download URL was not an approved ASUS ZIP/CAB'}
+    elseif(-not $urlValid){'Official download URL was not an approved ASUS ZIP/CAB/EXE'}
     elseif(-not $hashValid){'Official SHA-256 missing or invalid'}
     elseif($versionValue -lt $installed){'Installed driver version is newer; downgrade blocked'}
     else{''}
@@ -117,7 +117,7 @@ function Install-ASUS([object[]]$selected){
    Note 'Driver source is not an approved ASUS HTTPS hostname.' 'Red';continue
   }
   $ext=[IO.Path]::GetExtension($uri.AbsolutePath).ToLowerInvariant()
-  if($ext -notin @('.zip','.cab')){Note 'Only hash-verifiable ZIP/CAB INF packages are eligible for automatic installation.' 'Yellow';continue}
+  if($ext -notin @('.zip','.cab','.exe')){Note 'Only verified ASUS ZIP/CAB/EXE packages are allowed.' 'Yellow';continue}
   $dest=Join-Path $root ('ASUS-MediaTek-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
   [void](New-Item -ItemType Directory -Path $dest -Force)
   $file=Join-Path $dest ('MediaTekWLAN'+$ext)
@@ -130,6 +130,34 @@ function Install-ASUS([object[]]$selected){
     throw 'Downloaded package SHA-256 does not match official ASUS catalog. Rejected.'
    }
    Note 'ASUS package SHA-256 verified.' 'Green'
+   if($ext -eq '.exe'){
+    $signature=Get-AuthenticodeSignature -LiteralPath $file
+    if($signature.Status -ne 'Valid' -or [string]$signature.SignerCertificate.Subject -notmatch '(?i)ASUSTeK COMPUTER INC'){
+     throw 'Driver installer signature invalid or not signed by ASUSTeK. Execution blocked.'
+    }
+    $fileMeta=(Get-Item -LiteralPath $file).VersionInfo
+    if([string]$fileMeta.ProductName -notmatch '(?i)MediaTek.*WLAN'){
+     throw 'ASUS installer ProductName is not MediaTek WLAN Driver. Execution blocked.'
+    }
+    if([string]$fileMeta.OriginalFilename -notmatch '(?i)^WirelessLan_.+MediaTek.+\.exe$'){
+     throw 'Unexpected ASUS installer original filename. Execution blocked.'
+    }
+    $installerData=[IO.File]::ReadAllBytes($file)
+    $isInno=[Text.Encoding]::ASCII.GetString($installerData).Contains('Inno Setup')
+    if(-not $isInno){throw 'Unknown installer engine. Automatic execution blocked.'}
+    Note 'ASUSTeK signature verified; MediaTek WLAN Inno Setup installer identified.' 'Green'
+    $installLog=Join-Path $dest 'InnoSetup-install.log'
+    $logArg='/LOG="' + $installLog + '"'
+    $arguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/NOCLOSEAPPLICATIONS',$logArg)
+    Note 'Installing official ASUS WLAN driver silently (no automatic restart) ...' 'Yellow'
+    $process=Start-Process -FilePath $file -ArgumentList $arguments -PassThru -Wait -ErrorAction Stop
+    if($process.ExitCode -eq 0){
+     Note ('ASUS installer exited successfully. Reboot may be needed. Log: '+$installLog) 'Green'
+    }else{
+     Note ('ASUS installer exit code '+$process.ExitCode+'. Review log: '+$installLog) 'Red'
+    }
+    continue
+   }
    $extract=Join-Path $dest 'Extracted'
    [void](New-Item -ItemType Directory -Path $extract -Force)
    if($ext -eq '.zip'){Expand-Archive -LiteralPath $file -DestinationPath $extract -Force}
