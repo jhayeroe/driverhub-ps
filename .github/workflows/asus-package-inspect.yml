@@ -31,7 +31,16 @@ jobs:
           $hash=(Get-FileHash $f -Algorithm SHA256).Hash
           if($hash -ine $entry.sha256){throw 'Hash mismatch'}
           Write-Host "Verified ASUS SHA-256 $hash"
+          Write-Host ("ORIGINAL_FILENAME "+[IO.Path]::GetFileName($uri.AbsolutePath))
+          $signature=Get-AuthenticodeSignature -LiteralPath $f
+          Write-Host ("SIGNATURE status={0}, publisher={1}" -f $signature.Status,$signature.SignerCertificate.Subject)
+          $meta=(Get-Item -LiteralPath $f).VersionInfo
+          Write-Host ("PE_METADATA original={0}; description={1}; product={2}; company={3}" -f $meta.OriginalFilename,$meta.FileDescription,$meta.ProductName,$meta.CompanyName)
           $bytes=[System.IO.File]::ReadAllBytes($f)
+          $ascii=[Text.Encoding]::ASCII.GetString($bytes)
+          foreach($word in @('AsusSetup','SilentInstallRun','Inno Setup','silent','/VERYSILENT','InstallStep','Setup.exe','-s')){
+            Write-Host ("EMBEDDED_STRING {0}: {1}" -f $word,$ascii.Contains($word))
+          }
           Write-Host ("File first 16 bytes: "+[BitConverter]::ToString($bytes,0,16))
           $seven='C:\Program Files\7-Zip\7z.exe'
           if(Test-Path $seven){
