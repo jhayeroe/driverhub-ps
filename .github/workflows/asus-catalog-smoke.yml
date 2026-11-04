@@ -1,0 +1,44 @@
+name: ASUS FX506HF catalog smoke test
+
+on:
+  push:
+    paths:
+      - '.github/workflows/asus-catalog-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  asus-metadata:
+    runs-on: windows-latest
+    steps:
+      - name: Fetch ASUS driver metadata with Windows PowerShell
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $endpoints=@(
+            'https://www.asus.com/support/api/product.asmx/GetPDDrivers?website=ph&model=FX506HF&osid=52',
+            'https://rog.asus.com/support/webapi/product/GetPDDrivers?website=global&model=FX506HF&cpu=FX506HF&osid=52',
+            'https://www.asus.com/support/webapi/ProductV2/GetPDDrivers?website=ph&model=FX506HF&pdhashedid=&pdid=&cpu=&osid=52'
+          )
+          $hit=$null
+          foreach($url in $endpoints){
+            try{
+              Write-Host "Testing ASUS API: $(([uri]$url).Host)"
+              $reply=Invoke-RestMethod -Uri $url -TimeoutSec 20 -UseBasicParsing -Headers @{'User-Agent'='Mozilla/5.0';'Accept'='application/json'}
+              if($reply -is [string]){$reply=$reply | ConvertFrom-Json}
+              foreach($group in @($reply.Result.Obj)){
+                foreach($f in @($group.Files)){
+                  if([string]$f.Title -match '(?i)MediaTek.*WLAN|WLAN.*MediaTek'){
+                    $link=$f.DownloadUrl.Global
+                    $hit=$f
+                    Write-Host ("FOUND title={0}, version={1}, SHA256-length={2}, file-extension={3}" -f $f.Title,$f.Version,([string]$f.sha256).Length,[IO.Path]::GetExtension(([uri]$link).AbsolutePath))
+                    break
+                  }
+                }
+                if($hit){break}
+              }
+              if($hit){break}
+            }catch{
+              Write-Host "Endpoint did not return usable metadata: $($_.Exception.Message)"
+            }
+          }
+          if(-not $hit){throw 'ASUS did not return an accessible MediaTek WLAN package from any tested endpoint.'}
