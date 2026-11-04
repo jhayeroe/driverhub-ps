@@ -1,0 +1,43 @@
+name: ASUS FX506HF PowerShell catalog integration
+
+on:
+  push:
+    paths:
+      - 'DriverHub.ps1'
+      - 'AsusDrivers.ps1'
+      - '.github/workflows/asus-runtime-check.yml'
+  workflow_dispatch:
+
+jobs:
+  asus-script-metadata:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise ASUS PowerShell catalog code without installing drivers
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $path=(Resolve-Path 'AsusDrivers.ps1').Path
+          $tokens=$null
+          $errors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw 'Cannot run syntax-invalid ASUS extension'}
+          $names=@('Convert-DriverVersion','Get-ASUSCatalog')
+          $functions=@($ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -in $names
+          },$true))
+          foreach($fn in $functions){Invoke-Expression $fn.Extent.Text}
+          function Note([string]$s,[string]$color='Cyan'){Write-Host $s}
+          $asus=[pscustomobject]@{Model='ASUS TUF Gaming F15 FX506HF_FX506HF';Kind='ASUS'}
+          $result=Get-ASUSCatalog $asus
+          Write-Host "Catalog: $($result.Status)"
+          $found=@($result.Items)
+          if(-not $found.Count){throw 'PowerShell module found no ASUS MediaTek WLAN package.'}
+          foreach($item in $found){
+            Write-Host ("Found: {0}; URL={1}; SHA={2}" -f $item.Name,([uri]$item.Url).Host,$item.Sha256)
+            if($item.Source -ne 'ASUS' -or $item.Sha256 -notmatch '^[0-9a-fA-F]{64}$'){throw 'Metadata verification failed'}
+            if($item.Url -notmatch '(?i)\.exe$'){throw 'Unexpected ASUS package extension'}
+          }
+          Write-Host 'ASUS catalog function smoke check passed. No drivers installed.'
