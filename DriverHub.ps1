@@ -281,12 +281,13 @@ function Wifi-Menu {
   Write-Host '  [2] Rescan hardware devices'
   Write-Host '  [3] View detailed recent network errors'
   Write-Host '  [4] Show wireless connection details'
+  Write-Host '  [5] Reset Windows Winsock/TCP-IP stack (advanced; requires reboot)'
   Write-Host '  [0] Return to previous scan'
   $choice=Read-Host 'Choose'
   try{
    switch($choice){
     '1'{
-     $dev=@(Get-PnpDevice -PresentOnly|Where-Object {$_.Class -eq 'Net' -and $_.FriendlyName -match '(?i)Wi-?Fi|Wireless|WLAN|802\.11'})
+     $dev=@(Get-PnpDevice -PresentOnly|Where-Object {$_.Class -eq 'Net' -and $_.FriendlyName -match '(?i)Wi-?Fi|Wireless|WLAN|802\.11' -and $_.FriendlyName -notmatch '(?i)Virtual|Wi-Fi Direct|VPN|Bluetooth'})
      for($i=0;$i -lt $dev.Count;$i++){Note ('['+($i+1)+'] '+$dev[$i].FriendlyName)}
      if(-not $dev.Count){Note 'Wi-Fi device not found.' 'Yellow'}
      else{
@@ -303,6 +304,15 @@ function Wifi-Menu {
     '3'{$w.System|Select-Object -First 12 TimeCreated,ProviderName,Id,Message|Format-List|Out-Host
      $w.WLAN|Where-Object {$_.Level -in @(2,3)}|Select-Object -First 12 TimeCreated,Id,Message|Format-List|Out-Host}
     '4'{& "$env:windir\System32\netsh.exe" wlan show interfaces|Out-Host}
+    '5'{
+     Note 'Advanced repair: may reset manual IP, DNS, proxy/VPN-related network settings.' 'Yellow'
+     Note 'A Windows restart will be needed. This is not proof of a driver fault.' 'Yellow'
+     if(Ask 'Reset Windows Winsock and TCP/IP settings?'){
+      & "$env:windir\System32\netsh.exe" winsock reset | Out-Host
+      & "$env:windir\System32\netsh.exe" int ip reset | Out-Host
+      Note 'Commands completed. Check their output, then restart Windows manually.' 'Yellow'
+     }
+    }
     '0'{Note 'Returning to scan.'}
     default{Note 'Invalid option.' 'Yellow'}
    }
@@ -334,9 +344,9 @@ function Scan1-Menu {
   $choice=Read-Host 'Choose'
   try{
    switch($choice){
-    '1'{if($state.Catalog){Apply-Drivers $state.Catalog @($state.Catalog.Items|Where-Object Allowed) $null}}
+    '1'{if($state.Catalog){Apply-Drivers $state.Catalog @($state.Catalog.Items|Where-Object Allowed) $null;$state=Windows-Scan}}
     '2'{if($state.Catalog){$nums=Choose-Items $state.Catalog.Items.Count
-      if($nums.Count){$selected=@(foreach($n in $nums){$state.Catalog.Items[$n-1]});Apply-Drivers $state.Catalog $selected $null}
+      if($nums.Count){$selected=@(foreach($n in $nums){$state.Catalog.Items[$n-1]});Apply-Drivers $state.Catalog $selected $null;$state=Windows-Scan}
      }}
     '3'{Deep-Menu $state.Catalog}
     '4'{$state=Windows-Scan}
@@ -381,10 +391,10 @@ function Deep-Menu($catalog=$null){
   $choice=Read-Host 'Choose'
   try{
    switch($choice){
-    '1'{Apply-Drivers $ctx.WU @($available|Where-Object Allowed) $ctx.OEM}
+    '1'{Apply-Drivers $ctx.WU @($available|Where-Object Allowed) $ctx.OEM;$ctx=Deep-State $null}
     '2'{
      $others=@($available|Where-Object {$_.Allowed -and $_.Source -ne 'WU'})
-     if($others.Count){Apply-Drivers $ctx.WU $others $ctx.OEM}
+     if($others.Count){Apply-Drivers $ctx.WU $others $ctx.OEM;$ctx=Deep-State $null}
      else{Note 'No supported OEM updater or imported drivers available. External download cannot be safely automated on this PC yet.' 'Yellow'}
     }
     '3'{
@@ -393,7 +403,7 @@ function Deep-Menu($catalog=$null){
       Write-Host ('  [{0}] [{1}] {2}' -f ($i+1),$tag,$a.Name)
      }
      $nums=Choose-Items $available.Count
-     if($nums.Count){$selected=@(foreach($n in $nums){$available[$n-1]});Apply-Drivers $ctx.WU $selected $ctx.OEM}
+     if($nums.Count){$selected=@(foreach($n in $nums){$available[$n-1]});Apply-Drivers $ctx.WU $selected $ctx.OEM;$ctx=Deep-State $null}
     }
     '4'{Wifi-Menu}
     '5'{$ctx=Deep-State $null}
