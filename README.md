@@ -1,4 +1,4 @@
-# DriverHub PS v2.0
+# DriverHub PS v2.1
 
 Windows PowerShell 5.1 (Administrator), PowerShell-only driver scanning, staged installation and Wi-Fi diagnostics.
 
@@ -33,6 +33,20 @@ irm https://raw.githubusercontent.com/jhayeroe/driverhub-ps/main/DriverHub.ps1 |
 - The OEM batch utility does **not** expose each individual OEM package as a numbered selection in this script.
 - Settings offers a confirmed winget installation of Dell Command Update or Lenovo System Update on a compatible manufacturer's system. HP Image Assistant must currently be installed from HP support.
 - Supports manually imported **official manufacturer INF folders** installed via Windows PnPUtil.
+
+### ASUS TUF FX506HF Wi-Fi (November 2026)
+
+DriverHub now recognizes the ASUS FX506HF notebook and queries **ASUS' own online driver catalog** to find the MediaTek WLAN package, independently from Windows Update.
+
+- Current official ASUS reference: **MediaTek WLAN Driver v3.00.01.1338** (June 22, 2026), Windows 11 22H2+ and matching MediaTek hardware only.
+- It compares the installed driver version and blocks a downgrade when a higher version is installed. A same-version repair is offered when the ASUS installer supports it; this may not solve a hardware fault.
+- The ASUS API provides an **ASUS-hosted .exe**, not a ZIP. DriverHub checks the ASUS-published SHA-256, a valid ASUS publisher signature, the expected MediaTek product, and the Inno Setup installer format before running it.
+- The Inno Setup installer is invoked via PowerShell using **/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /NOCLOSEAPPLICATIONS**. Installation is preceded by explicit consent and (by default) a PnPUtil third-party driver backup.
+- The script attempts a restore point when enabled. After any installation, the Deep Scan refreshes and shows the updated driver status. A reboot may still be needed, but the installer is instructed not to trigger an automatic reboot.
+- It does **not** automatically update every ASUS laptop driver. This first integration covers the **ASUS FX506HF MediaTek WLAN** package, with Dell/HP/Lenovo integrations remaining separate.
+- ASUS' catalog endpoint is used by their website but is not a stable, officially documented public API. It can fail/change; if it becomes unavailable, DriverHub shows the error instead of downloading from random websites.
+
+Official references: [ASUS FX506HF drivers](https://www.asus.com/us/supportonly/fx506hf/helpdesk_download/), [ASUS driver installation instructions](https://www.asus.com/global/support/faq/1045127/), [Inno Setup command-line parameters](https://jrsoftware.org/ishelp/topic_setupcmdline.htm).
 
 **3. Settings** — Backup, restore-point attempt, OEM setup, local INF import, CSV reports.
 
