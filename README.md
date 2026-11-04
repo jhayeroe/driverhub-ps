@@ -16,7 +16,7 @@ irm https://raw.githubusercontent.com/jhayeroe/driverhub-ps/main/DriverHub.ps1 |
 
 - Detects present PnP devices with Device Manager errors (including missing driver Code 28).
 - Queries the Windows Update Agent for available driver packages.
-- Stays on the results screen until you choose: install all, multi-select, deep scan, re-scan, or main menu.
+- Stays on the results screen until you choose: install all, multi-select, deep scan, re-scan, or main menu; after installation the same scan flow refreshes the results.
 - If Windows Update has no applicable driver packages, explicitly offers Deep Scan.
 
 **2. Deep Scan (outside Windows Update)**
@@ -36,7 +36,7 @@ irm https://raw.githubusercontent.com/jhayeroe/driverhub-ps/main/DriverHub.ps1 |
 
 **3. Settings** — Backup, restore-point attempt, OEM setup, local INF import, CSV reports.
 
-**4. Wi-Fi diagnostics and repair** — Event logs, network adapter error counters, manual Wi-Fi device restart, hardware rescan. This repair menu does not automatically uninstall drivers or reset network configuration.
+**4. Wi-Fi diagnostics and repair** — Event logs, network adapter error counters, manual Wi-Fi device restart, hardware rescan, and an optional explicitly confirmed Winsock/TCP-IP reset (requires Windows restart and may affect manually configured networking). No automatic driver uninstall or network reset.
 
 **5. Exit**
 
