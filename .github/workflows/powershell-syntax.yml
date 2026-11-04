@@ -23,7 +23,12 @@ jobs:
             $parseErrors=$null
             $null=[System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$parseErrors)
             if (@($parseErrors).Count -gt 0) {
-              $parseErrors | Format-List Message,Extent | Out-Host
+              $contents=Get-Content -LiteralPath $file
+              foreach($err in $parseErrors) {
+                $line=[int]$err.Extent.StartLineNumber
+                Write-Host ("Line {0} Col {1}: {2}" -f $line,$err.Extent.StartColumnNumber,$err.Message)
+                if($line -ge 1 -and $line -le $contents.Count){Write-Host $contents[$line-1]}
+              }
               throw "$relative has $(@($parseErrors).Count) syntax errors"
             }
             Write-Host "$relative syntax OK"
